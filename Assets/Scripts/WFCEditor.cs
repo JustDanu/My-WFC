@@ -8,7 +8,7 @@ using System.Collections.Generic;
 public class WFCEditor : EditorWindow
 {
     private Tilemap currentTileMap;
-    Tile tile1, tile2, tile3;
+    Tile tile1, tile2, tile3, tile4;
 
     Vector2Int startPos, length, startWFC, WFCLength;
 
@@ -29,6 +29,7 @@ public class WFCEditor : EditorWindow
         tile1 = EditorGUILayout.ObjectField("Tile1", tile1, typeof(Tile), false) as Tile;
         tile2 = EditorGUILayout.ObjectField("Tile2", tile2, typeof(Tile), false) as Tile;
         tile3 = EditorGUILayout.ObjectField("Ttile3", tile3, typeof(Tile), false) as Tile;
+        tile4 = EditorGUILayout.ObjectField("Ttile4", tile4, typeof(Tile), false) as Tile;
 
         startPos = EditorGUILayout.Vector2IntField("Start Position", startPos);
         length = EditorGUILayout.Vector2IntField("Length", length);
@@ -72,16 +73,13 @@ public class WFCEditor : EditorWindow
                 {
                     tempRow.Add('c');
                 }
+
+                if(currTile == tile4)
+                {
+                    tempRow.Add('f');
+                }
             }
             readGrid.Add(new List<char>(tempRow));
-        }
-
-        foreach(List<char> list in readGrid)
-        {
-            foreach(char c in list)
-            {
-                Debug.Log(c);
-            }
         }
 
        inOut.ReadInput(readGrid);
@@ -92,7 +90,7 @@ public class WFCEditor : EditorWindow
 
        EditorUtility.SetDirty(currentTileMap);
 
-       Debug.Log(inOut.RulesToString());
+       //Debug.Log(inOut.RulesToString());
 
     }
 
@@ -114,6 +112,9 @@ public class WFCEditor : EditorWindow
                         break;
                     case 'c':
                         currentTileMap.SetTile(new Vector3Int(startWFC.x + x, startWFC.y + y), tile3);
+                        break;
+                    case 'f':
+                        currentTileMap.SetTile(new Vector3Int(startWFC.x + x, startWFC.y + y), tile4);
                         break;
                 }
             }

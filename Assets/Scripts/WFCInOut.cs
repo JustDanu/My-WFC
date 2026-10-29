@@ -17,7 +17,7 @@ public class WFCInOut
     private HashSet<char> lowestAllowedOptions;
     public List<List<char>> Excecute(int rows, int cols)
     {
-        possibleTiles = new List<char>{'g','c','s'};
+        possibleTiles = new List<char>{'g','c','s','f'};
 
         List<List<char>> generated = new List<List<char>>();
 
@@ -40,11 +40,14 @@ public class WFCInOut
         generated[randomRow][randomCol] = possibleTiles[randomChoiceIndex];
 
         Vector2Int current = new Vector2Int(randomCol, randomRow);
+        Debug.Log(current);
+        Debug.Log(generated[randomRow][randomCol]);
 
         int safetyTimeout = 0;
         while(generated.Any(anyList => anyList.Contains('e')))
         {
             current = GetLowestEntropy(generated);
+            Debug.Log(current);
 
             generated[current.y][current.x] = CollapseTile(rand);
 
@@ -62,7 +65,7 @@ public class WFCInOut
     private char CollapseTile(System.Random rand)
     {
         var chances = new List<(char tile, int chance)>();
-        int sumWeight = 0;
+        double sumWeight = 0;
 
         foreach(char c in lowestAllowedOptions)
         {
@@ -71,7 +74,9 @@ public class WFCInOut
 
         foreach(char c in lowestAllowedOptions)
         {
-            chances.Add((c, sumWeight/weights[c]));
+            int calculated = (int)((weights[c]/sumWeight)*100);
+            Debug.Log("Character: " + c + " Chance: " + calculated + " Weight: " + weights[c] + " Sum Weights: " + sumWeight);
+            chances.Add((c, calculated));
         }
 
         int roll = rand.Next(1, 101);
@@ -86,6 +91,8 @@ public class WFCInOut
                 break;
             }
         }
+
+        Debug.Log(selectedTile);
 
         return selectedTile;
     }
