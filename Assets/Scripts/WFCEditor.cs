@@ -4,13 +4,18 @@ using UnityEditor;
 using UnityEngine.Tilemaps;
 using System;
 using System.Collections.Generic;
+using UnityEditor.U2D.Aseprite;
+using System.Linq;
 
 public class WFCEditor : EditorWindow
 {
     private Tilemap currentTileMap;
-    Tile tile1, tile2, tile3, tile4;
+    private List<TileBase> tilesList;
+    Tile tile2;
 
     Vector2Int startPos, length, startWFC, WFCLength;
+
+    BoundsInt bound;
 
     private WFCInOut inOut;
 
@@ -25,12 +30,7 @@ public class WFCEditor : EditorWindow
         GUILayout.Label("WFC Settings");
 
         currentTileMap = EditorGUILayout.ObjectField("Tilemap", currentTileMap, typeof(Tilemap), true) as Tilemap;
-
-        tile1 = EditorGUILayout.ObjectField("Tile1", tile1, typeof(Tile), false) as Tile;
-        tile2 = EditorGUILayout.ObjectField("Tile2", tile2, typeof(Tile), false) as Tile;
-        tile3 = EditorGUILayout.ObjectField("Ttile3", tile3, typeof(Tile), false) as Tile;
-        tile4 = EditorGUILayout.ObjectField("Ttile4", tile4, typeof(Tile), false) as Tile;
-
+        
         startPos = EditorGUILayout.Vector2IntField("Start Position", startPos);
         length = EditorGUILayout.Vector2IntField("Length", length);
 
@@ -48,53 +48,48 @@ public class WFCEditor : EditorWindow
 
     void ExcecuteWFC()
     {
-        List<List<char>> readGrid = new();
+        List<List<int>> readGrid = new();
+        HashSet<int> possibleTiles = new();
+
         float endY = length.y + startPos.y;
         float endX = length.x + startPos.x;
 
+        BoundsInt currentBounds = new BoundsInt(new Vector3Int(startPos.x, startPos.y), new Vector3Int(length.x, length.y, 1));
+        TileBase[] tiles = currentTileMap.GetTilesBlock(currentBounds);
+        tilesList = tiles.ToList().Distinct().ToList();
+
+        foreach(var tile in tilesList)
+        {
+            Debug.Log(tile.name);
+        }
+
         for(int y = (int)startPos.y; y < endY; y++)
         {
-            List<char> tempRow = new List<char>();
+            List<int> tempRow = new List<int>();
             for(int x = (int)startPos.x; x < endX; x++)
             {
                 Tile currTile = (Tile)currentTileMap.GetTile(new Vector3Int(x, y));
-
-                if(currTile == tile1)
-                {
-                    tempRow.Add('g');
-                }
-
-                if(currTile == tile2)
-                {
-                    tempRow.Add('s');
-                }
-
-                if(currTile == tile3)
-                {
-                    tempRow.Add('c');
-                }
-
-                if(currTile == tile4)
-                {
-                    tempRow.Add('f');
-                }
+                
+                tempRow.Add(tilesList.IndexOf(currTile));
+                possibleTiles.Add(tilesList.IndexOf(currTile));
+                
             }
-            readGrid.Add(new List<char>(tempRow));
+            readGrid.Add(new List<int>(tempRow));
         }
 
        inOut.ReadInput(readGrid);
 
        Undo.RecordObject(currentTileMap, "TileMap update using WFC Algorithm");
 
-       DrawTiles(inOut.Excecute(WFCLength.x, WFCLength.y));
+       DrawTiles(inOut.Excecute(WFCLength.x, WFCLength.y, possibleTiles));
 
        EditorUtility.SetDirty(currentTileMap);
 
-       //Debug.Log(inOut.RulesToString());
+       Debug.Log(inOut.RulesToString());
 
     }
 
-    private void DrawTiles(List<List<char>> generated)
+    private void DrawTiles(List<List<int>> generated)
     {
         string output = "";
         for(int y = 0; y < generated.Count; y++)
@@ -102,21 +97,10 @@ public class WFCEditor : EditorWindow
             for(int x = 0; x < generated[y].Count; x++)
             {
                 output += generated[y][x] + " ";
-                switch(generated[y][x])
-                {
-                    case 'g':
-                        currentTileMap.SetTile(new Vector3Int(startWFC.x + x, startWFC.y + y), tile1);
-                        break;
-                    case 's':
-                        currentTileMap.SetTile(new Vector3Int(startWFC.x + x, startWFC.y + y), tile2);
-                        break;
-                    case 'c':
-                        currentTileMap.SetTile(new Vector3Int(startWFC.x + x, startWFC.y + y), tile3);
-                        break;
-                    case 'f':
-                        currentTileMap.SetTile(new Vector3Int(startWFC.x + x, startWFC.y + y), tile4);
-                        break;
-                }
+
+                if(generated[y][x] == -1) break;
+                
+                currentTileMap.SetTile(new Vector3Int(startWFC.x + x, startWFC.y + y), tilesList[generated[y][x]]);
             }
             output += "\n";
         }

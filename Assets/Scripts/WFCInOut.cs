@@ -7,26 +7,22 @@ using UnityEngine.Tilemaps;
 
 public class WFCInOut
 {
-    // Down, Up, Left, Right
-    private int[] dRow = {-1, 1, 0, 0};
-    private int[] dCol = {0, 0, -1, 1};
-
-    private List<char> possibleTiles;
-    private Dictionary<char, int> weights;
-    private HashSet<List<char>> inputRules;
-    private HashSet<char> lowestAllowedOptions;
-    public List<List<char>> Excecute(int rows, int cols)
+    private List<int> possibleTiles;
+    private Dictionary<int, int> weights;
+    private HashSet<(int, int, (int, int))> inputRules;
+    private HashSet<int> lowestAllowedOptions;
+    public List<List<int>> Excecute(int rows, int cols, HashSet<int> possibilites)
     {
-        possibleTiles = new List<char>{'g','c','s','f'};
+        possibleTiles = possibilites.ToList();
 
-        List<List<char>> generated = new List<List<char>>();
+        List<List<int>> generated = new List<List<int>>();
 
         for(int y = 0; y < rows; y++)
         {
-            generated.Add(new List<char>());
+            generated.Add(new List<int>());
             for(int x = 0; x < rows; x++)
             {
-                generated[y].Add('e');
+                generated[y].Add(-1);
             }
         }
 
@@ -40,14 +36,11 @@ public class WFCInOut
         generated[randomRow][randomCol] = possibleTiles[randomChoiceIndex];
 
         Vector2Int current = new Vector2Int(randomCol, randomRow);
-        Debug.Log(current);
-        Debug.Log(generated[randomRow][randomCol]);
 
         int safetyTimeout = 0;
-        while(generated.Any(anyList => anyList.Contains('e')))
+        while(generated.Any(anyList => anyList.Contains(-1)))
         {
             current = GetLowestEntropy(generated);
-            Debug.Log(current);
 
             generated[current.y][current.x] = CollapseTile(rand);
 
@@ -62,25 +55,25 @@ public class WFCInOut
         return generated; 
     }
 
-    private char CollapseTile(System.Random rand)
+    private int CollapseTile(System.Random rand)
     {
-        var chances = new List<(char tile, int chance)>();
+        var chances = new List<(int tile, int chance)>();
         double sumWeight = 0;
 
-        foreach(char c in lowestAllowedOptions)
+        foreach(int c in lowestAllowedOptions)
         {
             sumWeight += weights[c];
         }
 
-        foreach(char c in lowestAllowedOptions)
+        foreach(int c in lowestAllowedOptions)
         {
             int calculated = (int)((weights[c]/sumWeight)*100);
-            Debug.Log("Character: " + c + " Chance: " + calculated + " Weight: " + weights[c] + " Sum Weights: " + sumWeight);
+            //Debug.Log("Character: " + c + " Chance: " + calculated + " Weight: " + weights[c] + " Sum Weights: " + sumWeight);
             chances.Add((c, calculated));
         }
 
         int roll = rand.Next(1, 101);
-        char selectedTile = 'e';
+        int selectedTile = -1;
 
         foreach(var option in chances)
         {
@@ -92,12 +85,10 @@ public class WFCInOut
             }
         }
 
-        Debug.Log(selectedTile);
-
         return selectedTile;
     }
 
-    private Vector2Int GetLowestEntropy(List<List<char>> generated)
+    private Vector2Int GetLowestEntropy(List<List<int>> generated)
     {
         double currentLowest = double.MaxValue;
         Vector2Int current = Vector2Int.zero;
@@ -106,45 +97,28 @@ public class WFCInOut
         {
             for(int x = 0; x < generated[y].Count; x++)
             {
-                if(generated[y][x] == 'e')
+                if(generated[y][x] == -1)
                 {
-                    HashSet<char> allowedOptions = new HashSet<char>();
+                    HashSet<int> allowedOptions = new HashSet<int>();
 
-                    // Loop through the 4 directions and populate the allowedOptions list.
-                    for(int i = 0; i < 4; i++)
+                    for(int i = -1; i <= 1; i++)
                     {
-                        int nRow = y + dRow[i];
-                        int nCol = x + dCol[i];
-
-                        if(nRow >= 0 && nRow < generated.Count && nCol >= 0 && nCol < generated[nRow].Count)
+                        for(int j = -1; j <= 1; j++)
                         {
-                            char nValue = generated[nRow][nCol];
+                            if(x+j < 0 || y+i < 0 || (j == 0 && i == 0) || x+j >= generated[y].Count ||  y+i >= generated.Count) continue;
 
-                            if(nValue != 'e')
+                            int nValue = generated[y+i][x+j];
+
+                            if(nValue != -1)
                             {
-                                char oppDirection = 'e';
                                 // Get opposite direction
-                                switch(i)
-                                {
-                                    case 0:
-                                        oppDirection = 'u';
-                                        break;
-                                    case 1:
-                                        oppDirection = 'd';
-                                        break;
-                                    case 2:
-                                        oppDirection = 'r';
-                                        break;
-                                    case 3:
-                                        oppDirection = 'l';
-                                        break;
-                                }
+                                (int, int) oppDirection = (-j, -i);
 
-                                foreach(List<char> rule in inputRules)
+                                foreach(var rule in inputRules)
                                 {
-                                    if(rule[0] == nValue && rule[2] == oppDirection)
+                                    if(rule.Item1 == nValue && rule.Item3 == oppDirection)
                                     {
-                                        allowedOptions.Add(rule[1]);
+                                        allowedOptions.Add(rule.Item2);
                                     }
                                 }
                             }
@@ -157,7 +131,7 @@ public class WFCInOut
                     {
                         currentLowest = currentEntropy;
                         current = new Vector2Int(x, y);
-                        lowestAllowedOptions = new HashSet<char>(allowedOptions);
+                        lowestAllowedOptions = new HashSet<int>(allowedOptions);
                     }
                 }
             }
@@ -166,12 +140,12 @@ public class WFCInOut
         return current;
     }
 
-    private double CalculateEntropy(HashSet<char> allowedOptions)
+    private double CalculateEntropy(HashSet<int> allowedOptions)
     {
         double sumWeight = 0;
         double sumLogWeight = 0;
 
-        foreach(char c in allowedOptions)
+        foreach(int c in allowedOptions)
         {
             sumWeight += weights[c];
             sumLogWeight += weights[c] * Math.Log(weights[c]);
@@ -182,17 +156,18 @@ public class WFCInOut
         return entropy;
     }
 
-    public void ReadInput(List<List<char>> gridTiles)
+    public void ReadInput(List<List<int>> gridTiles)
     {
-        inputRules = new HashSet<List<char>>(new ListComparer<char>());
-        weights = new Dictionary<char, int>();
-        
+        inputRules = new HashSet<(int, int, (int, int))>();
+        weights = new Dictionary<int, int>();
+
         for(int y = 0; y < gridTiles.Count; y++)
         {
             for(int x = 0; x < gridTiles[y].Count; x++)
             {
-                List<char> rule = new List<char>();
-                rule.Add(gridTiles[y][x]);
+                (int, int, (int, int)) rule = new();
+
+                rule.Item1 = gridTiles[y][x];
 
                 if(weights.ContainsKey(gridTiles[y][x]))
                 {
@@ -200,44 +175,22 @@ public class WFCInOut
                 }
                 else weights.Add(gridTiles[y][x], 1);
 
-                if (y-1 >= 0)
+                for(int i = -1; i <= 1; i++)
                 {
-                    rule.Add(gridTiles[y-1][x]);
-                    rule.Add('d');
+                    for(int j = -1; j <= 1; j++)
+                    {
+                        //Debug.Log("Looking at: " + gridTiles[y][x]);
+                        //Debug.Log("Looking at position: " + "(" + j + ", " + i + ")");
 
-                    inputRules.Add(new List<char>(rule));
-                    rule = new List<char>();
-                    rule.Add(gridTiles[y][x]);
-                }
+                        if(x+j < 0 || y+i < 0 || (j == 0 && i == 0) || x+j >= gridTiles[y].Count ||  y+i >= gridTiles.Count) continue; // Fuckin return call
 
-                if (x-1 >= 0)
-                {
-                    rule.Add(gridTiles[y][x-1]);
-                    rule.Add('l');
+                        //Debug.Log("Tile looking at if exists: " + gridTiles[y+i][x+j]);
 
-                    inputRules.Add(new List<char>(rule));
-                    rule = new List<char>();
-                    rule.Add(gridTiles[y][x]);
-                }
+                        rule.Item2 = gridTiles[y+i][x+j];
+                        rule.Item3 = (j, i);
 
-                if (y+1 < gridTiles.Count)
-                {
-                    rule.Add(gridTiles[y+1][x]);
-                    rule.Add('u');
-
-                    inputRules.Add(new List<char>(rule));
-                    rule = new List<char>();
-                    rule.Add(gridTiles[y][x]);
-                }
-
-                if (x+1 <  gridTiles[y].Count)
-                {
-                    rule.Add(gridTiles[y][x+1]);
-                    rule.Add('r');
-
-                    inputRules.Add(new List<char>(rule));
-                    rule = new List<char>();
-                    rule.Add(gridTiles[y][x]);
+                        inputRules.Add(rule);
+                    }
                 }
             }
         }
@@ -252,12 +205,11 @@ public class WFCInOut
     {
         string ruleString = "";
 
-        foreach(List<char> chars in inputRules)
+        foreach(var ints in inputRules)
         {
-            foreach(char c in chars)
-            {
-                ruleString += c + " ";
-            }
+            ruleString += ints.Item1 + " ";
+            ruleString += ints.Item2 + " ";
+            ruleString += ints.Item3;
             ruleString += "\n";
         }
         return ruleString;
