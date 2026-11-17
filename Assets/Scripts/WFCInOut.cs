@@ -11,7 +11,7 @@ public class WFCInOut
     private Dictionary<int, int> weights;
     private HashSet<(int, int, (int, int))> inputRules;
     private HashSet<int> lowestAllowedOptions;
-    public List<List<int>> Excecute(int rows, int cols, HashSet<int> possibilites)
+    public List<List<int>> Excecute(int rows, int cols, HashSet<int> possibilites, List<Vector2Int> orderAdded)
     {
         possibleTiles = possibilites.ToList();
 
@@ -40,9 +40,13 @@ public class WFCInOut
         int safetyTimeout = 0;
         while(generated.Any(anyList => anyList.Contains(-1)))
         {
+            orderAdded.Add(current);
+            Debug.Log(current);
             current = GetLowestEntropy(generated);
 
-            generated[current.y][current.x] = CollapseTile(rand);
+            int collapsedTile = CollapseTile(rand);
+
+            generated[current.y][current.x] = collapsedTile;
 
             safetyTimeout++;
             if(safetyTimeout > 99999)
@@ -51,6 +55,7 @@ public class WFCInOut
                 break;
             }
         }
+        orderAdded.Add(current);
 
         return generated; 
     }
@@ -68,7 +73,7 @@ public class WFCInOut
         foreach(int c in lowestAllowedOptions)
         {
             int calculated = (int)((weights[c]/sumWeight)*100);
-            //Debug.Log("Character: " + c + " Chance: " + calculated + " Weight: " + weights[c] + " Sum Weights: " + sumWeight);
+            Debug.Log("Character: " + c + " Chance: " + calculated + " Weight: " + weights[c] + " Sum Weights: " + sumWeight);
             chances.Add((c, calculated));
         }
 

@@ -1,11 +1,13 @@
 using UnityEngine;
-using UnityEngine.UIElements;
 using UnityEditor;
 using UnityEngine.Tilemaps;
 using System;
 using System.Collections.Generic;
-using UnityEditor.U2D.Aseprite;
+using System.Collections;
 using System.Linq;
+using System.Threading.Tasks;
+using System.Threading;
+using Unity.EditorCoroutines.Editor;
 
 public class WFCEditor : EditorWindow
 {
@@ -60,7 +62,7 @@ public class WFCEditor : EditorWindow
 
         foreach(var tile in tilesList)
         {
-            Debug.Log(tile.name);
+            //Debug.Log(tile.name);
         }
 
         for(int y = (int)startPos.y; y < endY; y++)
@@ -68,6 +70,8 @@ public class WFCEditor : EditorWindow
             List<int> tempRow = new List<int>();
             for(int x = (int)startPos.x; x < endX; x++)
             {
+                if(!currentTileMap.HasTile(new Vector3Int(x, y))) continue;
+                
                 Tile currTile = (Tile)currentTileMap.GetTile(new Vector3Int(x, y));
                 
                 tempRow.Add(tilesList.IndexOf(currTile));
@@ -77,20 +81,25 @@ public class WFCEditor : EditorWindow
             readGrid.Add(new List<int>(tempRow));
         }
 
-       inOut.ReadInput(readGrid);
+        inOut.ReadInput(readGrid);
 
-       Undo.RecordObject(currentTileMap, "TileMap update using WFC Algorithm");
+        Undo.RecordObject(currentTileMap, "TileMap update using WFC Algorithm");
 
-       DrawTiles(inOut.Excecute(WFCLength.x, WFCLength.y, possibleTiles));
+        List<Vector2Int> positionOrder = new();
+        DrawTiles(inOut.Excecute(WFCLength.x, WFCLength.y, possibleTiles, positionOrder), positionOrder);
 
-       EditorUtility.SetDirty(currentTileMap);
+        EditorUtility.SetDirty(currentTileMap);
 
-       Debug.Log(inOut.RulesToString());
+        Debug.Log(inOut.RulesToString());
 
     }
 
-    private void DrawTiles(List<List<int>> generated)
+    private void DrawTiles(List<List<int>> generated, List<Vector2Int> positionOrder)
     {
+        //drawInOrder(generated, positionOrder);
+
+        EditorCoroutineUtility.StartCoroutine(drawInOrder(generated, positionOrder), this);
+        /*
         string output = "";
         for(int y = 0; y < generated.Count; y++)
         {
@@ -105,5 +114,18 @@ public class WFCEditor : EditorWindow
             output += "\n";
         }
         Debug.Log(output);
+        */
+    }
+
+    IEnumerator drawInOrder(List<List<int>> generated, List<Vector2Int> positionOrder)
+    {
+        foreach(Vector2Int pos in positionOrder)
+        {
+            currentTileMap.SetTile(new Vector3Int(startWFC.x + pos.x, startWFC.y + pos.y), tilesList[generated[pos.y][pos.x]]);
+            Debug.Log(pos.x + " " + pos.y);
+
+            // yield return new EditorWaitForSeconds(0.5f);
+            yield return null;
+        }
     }
 }
