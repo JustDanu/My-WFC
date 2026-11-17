@@ -17,8 +17,6 @@ public class WFCEditor : EditorWindow
 
     Vector2Int startPos, length, startWFC, WFCLength;
 
-    BoundsInt bound;
-
     private WFCInOut inOut;
 
     [MenuItem("WFC/OpenWFC")]
@@ -70,7 +68,11 @@ public class WFCEditor : EditorWindow
             List<int> tempRow = new List<int>();
             for(int x = (int)startPos.x; x < endX; x++)
             {
-                if(!currentTileMap.HasTile(new Vector3Int(x, y))) continue;
+                if(!currentTileMap.HasTile(new Vector3Int(x, y)))
+                {
+                    tempRow.Add(-1);
+                    continue;
+                }
                 
                 Tile currTile = (Tile)currentTileMap.GetTile(new Vector3Int(x, y));
                 
@@ -80,6 +82,17 @@ public class WFCEditor : EditorWindow
             }
             readGrid.Add(new List<int>(tempRow));
         }
+
+        string line = "";
+        foreach(List<int> ints in readGrid)
+        {
+            foreach(int num in ints)
+            {
+                line += num + " ";
+            }
+            line += "\n";
+        }
+        Debug.Log(line);
 
         inOut.ReadInput(readGrid);
 
@@ -98,7 +111,10 @@ public class WFCEditor : EditorWindow
     {
         //drawInOrder(generated, positionOrder);
 
-        EditorCoroutineUtility.StartCoroutine(drawInOrder(generated, positionOrder), this);
+        EditorCoroutineUtility.StartCoroutine(DrawInOrder(generated, positionOrder), this);
+
+        //JustDraw(generated, positionOrder);
+
         /*
         string output = "";
         for(int y = 0; y < generated.Count; y++)
@@ -117,15 +133,30 @@ public class WFCEditor : EditorWindow
         */
     }
 
-    IEnumerator drawInOrder(List<List<int>> generated, List<Vector2Int> positionOrder)
+    IEnumerator DrawInOrder(List<List<int>> generated, List<Vector2Int> positionOrder)
+    {
+        positionOrder = positionOrder.Distinct().ToList();
+        foreach(Vector2Int pos in positionOrder)
+        {
+            if(generated[pos.y][pos.x] == -1) continue;
+
+            currentTileMap.SetTile(new Vector3Int(startWFC.x + pos.x, startWFC.y + pos.y), tilesList[generated[pos.y][pos.x]]);
+            //Debug.Log(pos.x + " " + pos.y);
+
+            //yield return new EditorWaitForSeconds(0.5f);
+            yield return null;
+        }
+    }
+
+    void JustDraw(List<List<int>> generated, List<Vector2Int> positionOrder)
     {
         foreach(Vector2Int pos in positionOrder)
         {
             currentTileMap.SetTile(new Vector3Int(startWFC.x + pos.x, startWFC.y + pos.y), tilesList[generated[pos.y][pos.x]]);
-            Debug.Log(pos.x + " " + pos.y);
+            //Debug.Log(pos.x + " " + pos.y);
 
             // yield return new EditorWaitForSeconds(0.5f);
-            yield return null;
+            
         }
     }
 }

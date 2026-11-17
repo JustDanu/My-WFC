@@ -31,18 +31,18 @@ public class WFCInOut
         int randomRow = rand.Next(rows);
         int randomCol = rand.Next(cols);
 
-        int randomChoiceIndex = rand.Next(2);
+        int randomChoiceIndex = rand.Next(possibleTiles.Count);
 
         generated[randomRow][randomCol] = possibleTiles[randomChoiceIndex];
 
         Vector2Int current = new Vector2Int(randomCol, randomRow);
+        orderAdded.Add(current);
 
         int safetyTimeout = 0;
         while(generated.Any(anyList => anyList.Contains(-1)))
         {
-            orderAdded.Add(current);
-            Debug.Log(current);
             current = GetLowestEntropy(generated);
+            orderAdded.Add(current);
 
             int collapsedTile = CollapseTile(rand);
 
@@ -55,25 +55,28 @@ public class WFCInOut
                 break;
             }
         }
-        orderAdded.Add(current);
 
         return generated; 
     }
 
     private int CollapseTile(System.Random rand)
     {
+        /*
         var chances = new List<(int tile, int chance)>();
         double sumWeight = 0;
 
+        string allowedOptionsString = "";
         foreach(int c in lowestAllowedOptions)
         {
+            allowedOptionsString += c + " ";
             sumWeight += weights[c];
         }
+        Debug.Log(allowedOptionsString);
 
         foreach(int c in lowestAllowedOptions)
         {
             int calculated = (int)((weights[c]/sumWeight)*100);
-            Debug.Log("Character: " + c + " Chance: " + calculated + " Weight: " + weights[c] + " Sum Weights: " + sumWeight);
+            //Debug.Log("Character: " + c + " Chance: " + calculated + " Weight: " + weights[c] + " Sum Weights: " + sumWeight);
             chances.Add((c, calculated));
         }
 
@@ -89,13 +92,26 @@ public class WFCInOut
                 break;
             }
         }
+        */
+
+        string allowedOptionsString = "";
+        foreach(int c in lowestAllowedOptions)
+        {
+            allowedOptionsString += c + " ";
+        }
+        //Debug.Log(allowedOptionsString);
+        if(lowestAllowedOptions.Count == 0) return -1;
+
+        var lowestList = lowestAllowedOptions.ToList();
+
+        int selectedTile = lowestList[rand.Next(lowestList.Count)];
 
         return selectedTile;
     }
 
     private Vector2Int GetLowestEntropy(List<List<int>> generated)
     {
-        double currentLowest = double.MaxValue;
+        double currentLowest = possibleTiles.Count;
         Vector2Int current = Vector2Int.zero;
 
         for(int y = 0; y < generated.Count; y++)
@@ -104,13 +120,15 @@ public class WFCInOut
             {
                 if(generated[y][x] == -1)
                 {
-                    HashSet<int> allowedOptions = new HashSet<int>();
+                    List<List<int>> allowedOptions = new List<List<int>>();
 
                     for(int i = -1; i <= 1; i++)
                     {
                         for(int j = -1; j <= 1; j++)
                         {
                             if(x+j < 0 || y+i < 0 || (j == 0 && i == 0) || x+j >= generated[y].Count ||  y+i >= generated.Count) continue;
+
+                            List<int> tileAllowed = new List<int>();
 
                             int nValue = generated[y+i][x+j];
 
@@ -123,20 +141,31 @@ public class WFCInOut
                                 {
                                     if(rule.Item1 == nValue && rule.Item3 == oppDirection)
                                     {
-                                        allowedOptions.Add(rule.Item2);
+                                        tileAllowed.Add(rule.Item2);
                                     }
                                 }
+                                if(tileAllowed.Count > 0) allowedOptions.Add(tileAllowed);
                             }
                         }
                     }
 
-                    double currentEntropy = CalculateEntropy(allowedOptions);
+                    List<int> commonElements = new();
+                    if(allowedOptions.Count > 0)
+                    {
+                        commonElements = allowedOptions.Any()
+                            ? allowedOptions.Skip(1).Aggregate(
+                                new HashSet<int>(allowedOptions.First()),
+                                (common, nextList) => { common.IntersectWith(nextList); return common; }
+                            ).ToList() : new List<int>();
+                    }
 
-                    if(currentLowest > currentEntropy)
+                    double currentEntropy = commonElements.Count;
+
+                    if(currentLowest > currentEntropy && commonElements.Count != 0)
                     {
                         currentLowest = currentEntropy;
                         current = new Vector2Int(x, y);
-                        lowestAllowedOptions = new HashSet<int>(allowedOptions);
+                        lowestAllowedOptions = new HashSet<int>(commonElements);
                     }
                 }
             }
@@ -145,7 +174,7 @@ public class WFCInOut
         return current;
     }
 
-    private double CalculateEntropy(HashSet<int> allowedOptions)
+    private double CalculateEntropy(List<int> allowedOptions)
     {
         double sumWeight = 0;
         double sumLogWeight = 0;
@@ -170,6 +199,8 @@ public class WFCInOut
         {
             for(int x = 0; x < gridTiles[y].Count; x++)
             {
+                if (gridTiles[y][x] == -1) continue;
+
                 (int, int, (int, int)) rule = new();
 
                 rule.Item1 = gridTiles[y][x];
@@ -188,6 +219,8 @@ public class WFCInOut
                         //Debug.Log("Looking at position: " + "(" + j + ", " + i + ")");
 
                         if(x+j < 0 || y+i < 0 || (j == 0 && i == 0) || x+j >= gridTiles[y].Count ||  y+i >= gridTiles.Count) continue; // Fuckin return call
+
+                        if(gridTiles[y+i][x+j] == -1) continue;
 
                         //Debug.Log("Tile looking at if exists: " + gridTiles[y+i][x+j]);
 
@@ -218,31 +251,5 @@ public class WFCInOut
             ruleString += "\n";
         }
         return ruleString;
-    }
-}
-
-#nullable enable
-public class ListComparer<T> : IEqualityComparer<List<T>>
-{
-    public bool Equals(List<T>? x, List<T>? y)
-    {
-        if (ReferenceEquals(x, y)) return true;
-        if (x == null || y == null) return false;
-        
-        // SequenceEqual checks if items match and are in the same sequence
-        return x.SequenceEqual(y);
-    }
-
-    public int GetHashCode(List<T> obj)
-    {
-        if (obj == null) return 0;
-        
-        // Combine hashes of all elements inside the list to create a unique hash code
-        HashCode hash = new HashCode();
-        foreach (var item in obj)
-        {
-            hash.Add(item);
-        }
-        return hash.ToHashCode();
     }
 }
