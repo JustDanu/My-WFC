@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -11,6 +12,8 @@ public class WFCInOut
     private Dictionary<int, int> weights;
     private HashSet<(int, int, (int, int))> inputRules;
     private HashSet<int> lowestAllowedOptions;
+
+    private Stack<(List<List<int>>, List<int>, int)> collapseHistory;
     public List<List<int>> Excecute(int rows, int cols, HashSet<int> possibilites, List<Vector2Int> orderAdded)
     {
         possibleTiles = possibilites.ToList();
@@ -28,15 +31,25 @@ public class WFCInOut
 
         System.Random rand = new System.Random();
 
-        int randomRow = rand.Next(rows);
-        int randomCol = rand.Next(cols);
+        int randomRow = 0;
+        int randomCol = 0;
 
-        int randomChoiceIndex = rand.Next(possibleTiles.Count);
+        Vector2Int current = Vector2Int.zero;;
 
-        generated[randomRow][randomCol] = possibleTiles[randomChoiceIndex];
+        for(int i = 0; i < 1; i++)
+        {
+            randomRow = rand.Next(rows);
+            randomCol = rand.Next(cols);
 
-        Vector2Int current = new Vector2Int(randomCol, randomRow);
-        orderAdded.Add(current);
+            int randomChoiceIndex = rand.Next(possibleTiles.Count);
+
+            generated[randomRow][randomCol] = possibleTiles[randomChoiceIndex];
+
+            current = new Vector2Int(randomCol, randomRow);
+            orderAdded.Add(current);
+        }
+
+        collapseHistory = new();
 
         int safetyTimeout = 0;
         while(generated.Any(anyList => anyList.Contains(-1)))
@@ -44,7 +57,7 @@ public class WFCInOut
             current = GetLowestEntropy(generated);
             orderAdded.Add(current);
 
-            int collapsedTile = CollapseTile(rand);
+            int collapsedTile = CollapseTile(rand, generated);
 
             generated[current.y][current.x] = collapsedTile;
 
@@ -59,7 +72,7 @@ public class WFCInOut
         return generated; 
     }
 
-    private int CollapseTile(System.Random rand)
+    private int CollapseTile(System.Random rand, List<List<int>> currentGenerated)
     {
         /*
         var chances = new List<(int tile, int chance)>();
@@ -100,13 +113,29 @@ public class WFCInOut
             allowedOptionsString += c + " ";
         }
         //Debug.Log(allowedOptionsString);
-        if(lowestAllowedOptions.Count == 0) return -1;
+        if(lowestAllowedOptions.Count == 0)
+        {
+            for(int i = 0; i < 4; i++)
+            {
+                rewindMap(collapseHistory, currentGenerated);
+            }
+            
+            return -1;
+        }
 
         var lowestList = lowestAllowedOptions.ToList();
 
         int selectedTile = lowestList[rand.Next(lowestList.Count)];
+        //Debug.Log(selectedTile);
+
+        collapseHistory.Push((currentGenerated, lowestList, selectedTile));
 
         return selectedTile;
+    }
+
+    private void rewindMap(Stack<(List<List<int>>, List<int>, int)> collapseHistory, List<List<int>> currentGenerated)
+    {
+        currentGenerated = collapseHistory.Pop().Item1;
     }
 
     private Vector2Int GetLowestEntropy(List<List<int>> generated)
@@ -152,11 +181,8 @@ public class WFCInOut
                     List<int> commonElements = new();
                     if(allowedOptions.Count > 0)
                     {
-                        commonElements = allowedOptions.Any()
-                            ? allowedOptions.Skip(1).Aggregate(
-                                new HashSet<int>(allowedOptions.First()),
-                                (common, nextList) => { common.IntersectWith(nextList); return common; }
-                            ).ToList() : new List<int>();
+                        commonElements = allowedOptions.Any() ? allowedOptions.Skip(1).Aggregate(new HashSet<int>(allowedOptions.First()),
+                                        (common, nextList) => { common.IntersectWith(nextList); return common; }).ToList() : new List<int>();
                     }
 
                     double currentEntropy = commonElements.Count;
